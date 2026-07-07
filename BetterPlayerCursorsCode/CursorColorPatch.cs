@@ -7,44 +7,73 @@ namespace BetterPlayerCursors.BetterPlayerCursorsCode;
 
 public static class CursorTinter
 {
-    private static readonly Color Tint = new(1f, 0.4f, 0.4f);
+    private static readonly string[] CursorFields = { "_cursorTilted", "_cursorNotTilted", "_cursorInspect" };
 
-    private static readonly HashSet<ulong> Tinted = new();
+    // untinted originals, keyed by manager instance + field
+    private static readonly Dictionary<(ulong, string), Image> Originals = new();
 
-    public static void TintOnce(NCursorManager instance)
+    private static NCursorManager? _manager;
+    private static Color _appliedColor = new(1f, 1f, 1f);
+    private static bool _tintedOnce;
+
+    public static void OnCursorManagerSeen(NCursorManager instance)
     {
-        if (!Tinted.Add(instance.GetInstanceId()))
+        _manager = instance;
+        if (!_tintedOnce)
+        {
+            _tintedOnce = true;
+            Apply();
+        }
+    }
+
+    // called on first sight of the cursor manager and again on every config change
+    public static void Apply()
+    {
+        if (_manager == null)
             return;
 
-        TintField(instance, "_cursorTilted");
-        TintField(instance, "_cursorNotTilted");
-        TintField(instance, "_cursorInspect");
+        Color target = CursorConfig.EnableTint ? CursorConfig.CursorColor : new Color(1f, 1f, 1f);
+        if (target == _appliedColor && _tintedOnce)
+            return;
 
-        // clear the game's cursor cache so the tinted image actually gets applied
-        AccessTools.Field(typeof(NCursorManager), "_lastSetCursor").SetValue(instance, null);
+        foreach (string field in CursorFields)
+            TintField(_manager, field, target);
 
-        var inspect = (Image?)AccessTools.Field(typeof(NCursorManager), "_cursorInspect").GetValue(instance);
+        _appliedColor = target;
+
+        // clear the game's cursor cache so the new image actually gets applied
+        AccessTools.Field(typeof(NCursorManager), "_lastSetCursor").SetValue(_manager, null);
+        AccessTools.Method(typeof(NCursorManager), "UpdateCursor").Invoke(_manager, null);
+
+        var inspect = (Image?)AccessTools.Field(typeof(NCursorManager), "_cursorInspect").GetValue(_manager);
         if (inspect != null)
             Input.SetCustomMouseCursor(inspect, Input.CursorShape.Help, new Vector2(12f, 12f)); // hotspot from decompile
 
-        MainFile.Logger.Info("Cursor tint applied.");
+        MainFile.Logger.Info($"Cursor tint applied: {target}");
     }
 
-    private static void TintField(NCursorManager instance, string fieldName)
+    private static void TintField(NCursorManager instance, string fieldName, Color tint)
     {
         var image = (Image?)AccessTools.Field(typeof(NCursorManager), fieldName).GetValue(instance);
         if (image == null)
             return;
 
-        if (image.IsCompressed())
-            image.Decompress();
+        var key = (instance.GetInstanceId(), fieldName);
+        if (!Originals.TryGetValue(key, out Image? original))
+        {
+            if (image.IsCompressed())
+                image.Decompress();
+            original = (Image)image.Duplicate();
+            Originals[key] = original;
+        }
 
+        // rewrite the live image from the clean original so repeated color changes don't stack
         for (int y = 0; y < image.GetHeight(); y++)
         {
             for (int x = 0; x < image.GetWidth(); x++)
             {
-                Color p = image.GetPixel(x, y);
-                image.SetPixel(x, y, new Color(p.R * Tint.R, p.G * Tint.G, p.B * Tint.B, p.A));
+                Color p = original.GetPixel(x, y);
+                image.SetPixel(x, y, new Color(p.R * tint.R, p.G * tint.G, p.B * tint.B, p.A));
             }
         }
     }
@@ -55,11 +84,11 @@ public static class CursorTinter
 [HarmonyPatch(typeof(NCursorManager), "UpdateCursor")]
 public static class UpdateCursorPatch
 {
-    public static void Prefix(NCursorManager __instance) => CursorTinter.TintOnce(__instance);
+    public static void Prefix(NCursorManager __instance) => CursorTinter.OnCursorManagerSeen(__instance);
 }
 
 [HarmonyPatch(typeof(NCursorManager), "_EnterTree")]
 public static class EnterTreePatch
 {
-    public static void Postfix(NCursorManager __instance) => CursorTinter.TintOnce(__instance);
+    public static void Postfix(NCursorManager __instance) => CursorTinter.OnCursorManagerSeen(__instance);
 }
