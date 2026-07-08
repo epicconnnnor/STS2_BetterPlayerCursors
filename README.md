@@ -13,7 +13,7 @@ A Slay the Spire 2 mod that lets you change your mouse cursor color, and gives e
 
 ## Install
 
-**Steam Workshop (easiest):** subscribe [here]([WORKSHOP_LINK_HERE](https://steamcommunity.com/sharedfiles/filedetails/?id=3760146600)) and you're done.
+**Steam Workshop (easiest):** subscribe [here](https://steamcommunity.com/sharedfiles/filedetails/?id=3760146600) and you're done.
 
 **Manual:** grab the latest release, drop the `BetterPlayerCursors` folder into `Slay the Spire 2/mods/`.
 
