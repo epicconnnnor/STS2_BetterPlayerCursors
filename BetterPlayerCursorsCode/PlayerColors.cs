@@ -8,7 +8,6 @@ public static class PlayerColors
 {
     private static readonly Color[] Palette =
     {
-        new(1.00f, 1.00f, 1.00f), // original cursor, player 1
         new(0.02f, 0.96f, 0.82f), // cyan
         new(0.94f, 0.16f, 0.04f), // red
         new(1.00f, 0.83f, 0.00f), // yellow
@@ -16,6 +15,7 @@ public static class PlayerColors
         new(0.13f, 0.98f, 0.00f), // green
         new(0.97f, 0.56f, 0.02f), // orange
         new(0.14f, 0.40f, 1.00f), // blue
+        new(1.00f, 0.56f, 0.67f), // pink
     };
 
     public static Color ForPlayer(ulong netId)
@@ -37,15 +37,6 @@ public static class PlayerColors
         // tests-only, so reflection on the property is the safer long-term bet
         var state = (RunState?)AccessTools.Property(typeof(RunManager), "State")
             .GetValue(RunManager.Instance);
-
-        if (state == null)
-        {
-            MainFile.Logger.Info($"[ColorDebug] slot lookup for {netId}: no RunState (fallback to hash)");
-            return -1;
-        }
-
-        int slot = state.GetPlayerSlotIndex(netId);
-        MainFile.Logger.Info($"[ColorDebug] slot lookup for {netId}: slot {slot}");
-        return slot;
+        return state?.GetPlayerSlotIndex(netId) ?? -1;
     }
 }
