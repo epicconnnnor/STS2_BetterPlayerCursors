@@ -10,7 +10,7 @@ namespace BetterPlayerCursors.BetterPlayerCursorsCode;
 [HarmonyPatch(typeof(NCreature), "_Ready")]
 public static class CreatureColorDotPatch
 {
-    private const float DotSize = 18f;
+    private const float DotSize = 7f;
 
     public static void Postfix(NCreature __instance)
     {

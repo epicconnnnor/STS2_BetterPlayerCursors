@@ -23,5 +23,8 @@ public partial class MainFile : Node
         Config.ConfigChanged += (_, _) => CursorTinter.Apply();
         Config.OnConfigReloaded += CursorTinter.Apply;
         ModConfigRegistry.Register(ModId, Config);
+
+        // cursors spawn in the lobby before slot indices exist; recolor them once the run starts
+        MegaCrit.Sts2.Core.Runs.RunManager.Instance.RunStarted += _ => RemoteCursorColorPatches.ReapplyAll();
     }
 }
