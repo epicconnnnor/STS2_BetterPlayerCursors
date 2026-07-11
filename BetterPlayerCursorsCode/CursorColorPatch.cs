@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 
 namespace BetterPlayerCursors.BetterPlayerCursorsCode;
@@ -19,22 +20,18 @@ public static class CursorTinter
     public static void OnCursorManagerSeen(NCursorManager instance)
     {
         _manager = instance;
-        if (!_tintedOnce)
-        {
-            _tintedOnce = true;
-            Apply();
-        }
+        Apply(); // cheap no-op when the target color hasn't changed
     }
 
-    // called on first sight of the cursor manager and again on every config change
     public static void Apply()
     {
         if (_manager == null)
             return;
 
-        Color target = CursorConfig.EnableTint ? CursorConfig.CursorColor : new Color(1f, 1f, 1f);
+        Color target = TargetColor();
         if (target == _appliedColor && _tintedOnce)
             return;
+        _tintedOnce = true;
 
         foreach (string field in CursorFields)
             TintField(_manager, field, target);
@@ -48,8 +45,19 @@ public static class CursorTinter
         var inspect = (Image?)AccessTools.Field(typeof(NCursorManager), "_cursorInspect").GetValue(_manager);
         if (inspect != null)
             Input.SetCustomMouseCursor(inspect, Input.CursorShape.Help, new Vector2(12f, 12f)); // hotspot from decompile
+    }
 
-        MainFile.Logger.Info($"Cursor tint applied: {target}");
+    private static Color TargetColor()
+    {
+        // in a run with auto on, follow the character (or slot, via ForPlayer's fallbacks)
+        if (CursorConfig.AutoCharacterColor && LocalContext.NetId is ulong id)
+        {
+            Color c = PlayerColors.ForPlayer(id);
+            if (c != new Color(1f, 1f, 1f) || !CursorConfig.EnableTint)
+                return c;
+        }
+
+        return CursorConfig.EnableTint ? CursorConfig.CursorColor : new Color(1f, 1f, 1f);
     }
 
     private static void TintField(NCursorManager instance, string fieldName, Color tint)
@@ -67,7 +75,7 @@ public static class CursorTinter
             Originals[key] = original;
         }
 
-        // rewrite the live image from the clean original so repeated color changes don't stack
+        // rewrite from the clean original so repeated color changes don't stack
         for (int y = 0; y < image.GetHeight(); y++)
         {
             for (int x = 0; x < image.GetWidth(); x++)
@@ -80,7 +88,8 @@ public static class CursorTinter
 }
 
 // NCursorManager already exists before mods load, so _EnterTree alone never fires for it.
-// UpdateCursor runs on every cursor refresh and catches the existing instance.
+// UpdateCursor runs on every cursor refresh; Apply() early-outs when nothing changed, and
+// this is also what picks up the character color once a run starts (no run-start event needed).
 [HarmonyPatch(typeof(NCursorManager), "UpdateCursor")]
 public static class UpdateCursorPatch
 {

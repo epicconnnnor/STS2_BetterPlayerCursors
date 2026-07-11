@@ -1,22 +1,18 @@
-using System.Collections.Generic;
-using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Nodes.Multiplayer;
 
 namespace BetterPlayerCursors.BetterPlayerCursorsCode;
 
+// Modulate tints the whole cursor Control. Applied at _Ready for the initial color and
+// re-applied on every UpdateImage so cursors created in the lobby (before RunState exists)
+// pick up their real color once the run starts and input states change.
 [HarmonyPatch]
 public static class RemoteCursorColorPatches
 {
-    // live remote cursors, so colors can be re-applied when the run starts
-    // (cursors are created in the lobby, before slot indices exist)
-    private static readonly List<NRemoteMouseCursor> Cursors = new();
-
     [HarmonyPatch(typeof(NRemoteMouseCursor), "_Ready")]
     [HarmonyPostfix]
     public static void ReadyPostfix(NRemoteMouseCursor __instance)
     {
-        Cursors.Add(__instance);
         __instance.Modulate = PlayerColors.ForPlayer(__instance.PlayerId);
     }
 
@@ -25,12 +21,5 @@ public static class RemoteCursorColorPatches
     public static void UpdateImagePostfix(NRemoteMouseCursor __instance)
     {
         __instance.Modulate = PlayerColors.ForPlayer(__instance.PlayerId);
-    }
-
-    public static void ReapplyAll()
-    {
-        Cursors.RemoveAll(c => !GodotObject.IsInstanceValid(c));
-        foreach (var cursor in Cursors)
-            cursor.Modulate = PlayerColors.ForPlayer(cursor.PlayerId);
     }
 }
